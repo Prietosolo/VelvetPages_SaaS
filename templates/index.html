@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>VelvetPages Cloud</title>
+    <style>
+        :root { --bg: #F3F4F6; --txt: #111827; --card: #FFFFFF; --prim: #8B5CF6; --bord: #E5E7EB; }
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Segoe UI', sans-serif; }
+        body { background-color: var(--bg); color: var(--txt); padding-bottom: 80px; }
+        
+        #login-screen { padding: 40px 20px; text-align: center; display: flex; flex-direction: column; height: 100vh; justify-content: center;}
+        #app-screen { display: none; }
+        
+        .card-auth { background: white; padding: 30px; border-radius: 15px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
+        input { width: 100%; padding: 12px; margin-bottom: 15px; border: 1px solid #ccc; border-radius: 8px; font-size: 16px;}
+        button { width: 100%; padding: 12px; background: var(--prim); color: white; border: none; border-radius: 8px; font-weight: bold; font-size: 16px; cursor: pointer; }
+        .link { color: var(--prim); margin-top: 15px; display: block; cursor: pointer; font-size: 14px;}
+
+        header { background: var(--prim); color: white; padding: 20px; display: flex; justify-content: space-between; align-items: center; }
+        .grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 15px; padding: 15px; }
+        .card { background: var(--card); border-radius: 10px; padding: 10px; border: 1px solid var(--bord); text-align: center; }
+        .card img { width: 100%; height: 150px; object-fit: cover; border-radius: 5px; margin-bottom: 5px; }
+        .btn-logout { background: transparent; color: white; border: 1px solid white; width: auto; padding: 5px 10px; font-size: 14px;}
+    </style>
+</head>
+<body>
+
+    <!-- PANTALLA DE LOGIN / REGISTRO -->
+    <div id="login-screen">
+        <h1 style="color: #8B5CF6; font-size: 32px; margin-bottom: 10px;">VelvetPages</h1>
+        <p style="color: #666; margin-bottom: 20px;">Sincroniza tu biblioteca en la nube</p>
+        
+        <div class="card-auth">
+            <input type="email" id="auth-email" placeholder="Correo electrónico">
+            <input type="password" id="auth-pass" placeholder="Contraseña">
+            <button onclick="login()">Iniciar Sesión</button>
+            <button onclick="registro()" style="background: white; color: #8B5CF6; border: 1px solid #8B5CF6; margin-top: 10px;">Crear Cuenta</button>
+        </div>
+    </div>
+
+    <!-- PANTALLA PRINCIPAL DE LA APP -->
+    <div id="app-screen">
+        <header>
+            <h2>Mi Biblioteca</h2>
+            <button class="btn-logout" onclick="logout()">Salir</button>
+        </header>
+
+        <div class="grid" id="grid-libros"></div>
+        <button style="position:fixed; bottom:20px; right:20px; width:60px; height:60px; border-radius:50%; font-size:24px;" onclick="agregarLibroDemo()">+</button>
+    </div>
+
+    <script>
+        // --- LÓGICA DE AUTENTICACIÓN ---
+        async function registro() {
+            const email = document.getElementById('auth-email').value;
+            const pass = document.getElementById('auth-pass').value;
+            
+            const res = await fetch('/api/register', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({email, password: pass})
+            });
+            const data = await res.json();
+            
+            if (res.ok) { alert("Cuenta creada. Entrando..."); mostrarApp(); }
+            else { alert(data.error); }
+        }
+
+        async function login() {
+            const email = document.getElementById('auth-email').value;
+            const pass = document.getElementById('auth-pass').value;
+            
+            const res = await fetch('/api/login', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({email, password: pass})
+            });
+            
+            if (res.ok) { mostrarApp(); }
+            else { alert("Credenciales incorrectas"); }
+        }
+
+        async function logout() {
+            await fetch('/api/logout', { method: 'POST' });
+            document.getElementById('app-screen').style.display = 'none';
+            document.getElementById('login-screen').style.display = 'flex';
+        }
+
+        function mostrarApp() {
+            document.getElementById('login-screen').style.display = 'none';
+            document.getElementById('app-screen').style.display = 'block';
+            cargarLibrosNube();
+        }
+
+        // --- LÓGICA DE LA BIBLIOTECA EN LA NUBE ---
+        async function cargarLibrosNube() {
+            const res = await fetch('/api/libros');
+            if (!res.ok) return;
+            
+            const libros = await res.json();
+            const grid = document.getElementById('grid-libros');
+            grid.innerHTML = '';
+
+            libros.forEach(l => {
+                const img = l.imagen || 'https://via.placeholder.com/150x200?text=Sin+Portada';
+                grid.innerHTML += `
+                    <div class="card">
+                        <img src="${img}">
+                        <h3>${l.titulo}</h3>
+                        <p style="color:#F59E0B;">⭐ ${l.estrellas}</p>
+                        <button onclick="eliminarLibro(${l.id})" style="background:red; margin-top:10px; padding: 5px;">X</button>
+                    </div>
+                `;
+            });
+        }
+
+        // Función temporal para probar (puedes reemplazarla por tu modal real)
+        async function agregarLibroDemo() {
+            const titulo = prompt("Título del libro (Prueba de guardado en la nube):");
+            if (!titulo) return;
+            
+            await fetch('/api/libros', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    titulo: titulo, autor: "Autor Demo", imagen: "", estrellas: 5, paginas: 100
+                })
+            });
+            cargarLibrosNube(); 
+        }
+
+        async function eliminarLibro(id) {
+            if(!confirm("¿Eliminar libro de la nube?")) return;
+            await fetch(`/api/libros/${id}`, { method: 'DELETE' });
+            cargarLibrosNube();
+        }
+    </script>
+</body>
+</html>
